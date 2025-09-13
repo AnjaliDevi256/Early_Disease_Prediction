@@ -82,7 +82,7 @@ if uploaded_file is not None:
         st.subheader(f"🔹 {name} Results")
         st.write(f"**Accuracy:** {acc*100:.2f}%")
         st.write(f"**Precision:** {precision_score(y_test, y_pred)*100:.2f}%")
-        st.write(f"**Recall:** {recall_score(y_test, y_pred*100:.2f}%")
+        st.write(f"**Recall:** {recall_score(y_test, y_pred)*100:.2f}%")
         st.write(f"**F1 Score:** {f1_score(y_test, y_pred)*100:.2f}%")
         st.text("Classification Report:")
         st.text(classification_report(y_test, y_pred))
@@ -130,4 +130,5 @@ if uploaded_file is not None:
         fig, ax = plt.subplots(figsize=(12, 7))
         sns.heatmap(correlation_matrix.round(2), annot=True, cmap='coolwarm', ax=ax)
         st.pyplot(fig)
+
 
