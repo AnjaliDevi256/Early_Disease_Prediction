@@ -82,6 +82,9 @@ labels.append("KNN")
 # -----------------------------------
 # Show Accuracy Comparison
 # -----------------------------------
+st.subheader(" Model Performance")
+for model, acc in results.items():
+    st.write(f"**{model} Accuracy:** {acc:.2f}%")
 st.subheader(" Model Accuracy Comparison")
 acc_df = pd.DataFrame({"Model": labels, "Accuracy": values})
 st.bar_chart(acc_df.set_index("Model"))
@@ -120,7 +123,7 @@ active = st.radio("Physically active?", [0, 1], format_func=lambda x: "Yes" if x
 # -----------------------------------
 if st.button("Predict Disease"):
     new_data = pd.DataFrame([{
-        "age": age_days,
+        "age": age,
         "height": height_cm/100,
         "weight": weight,
         "ap_hi": ap_hi,
@@ -166,3 +169,4 @@ if st.button("Predict Disease"):
     # Best model’s prediction
     best_prediction = predictions[best_model_name]
     st.success(f"Recommended Model: {best_model_name} → {'Disease' if best_prediction==1 else 'No Disease'}")
+
