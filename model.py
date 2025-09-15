@@ -1,134 +1,122 @@
-# app.py
-# ---------------------------------------------------
-# 1. Import Libraries
-# ---------------------------------------------------
-import pandas as pd
+import streamlit as st
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import streamlit as st
-
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import (accuracy_score, precision_score, 
-    recall_score, f1_score, classification_report, confusion_matrix)
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
+# -------------------
+# Load & Preprocess Data
+# -------------------
+data = pd.read_csv("Data_file.csv")
 
-# ---------------------------------------------------
-# 2. Streamlit App Layout
-# ---------------------------------------------------
-st.title("🩺 Disease Prediction Dashboard")
+df = data.drop(['date','country','occupation'],axis=1)
+df['age'] = (df['age']/365).astype(int)
+df['height'] = df['height']/100
+df.drop("id", axis=1, inplace=True)
 
-st.sidebar.header("Upload Dataset")
-uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
+# Feature Engineering
+df['pulse_pressure'] = df['ap_hi'] - df['ap_lo']
+df['cholesterol'] = df['cholesterol'].apply(lambda x: 'normal' if x==1 else('above_normal' if x==2 else 'well_above_normal'))
+df['gluc'] = df['gluc'].apply(lambda x: 'normal' if x==1 else('above_normal' if x==2 else 'well_above_normal'))
+df['map'] = df['ap_lo'] + (df['ap_hi'] - df['ap_lo'])/3
+df['bmi'] = df['weight'] / (df['height'])**2
+df['sys_dsys_ratio'] = df['ap_hi'] / df['ap_lo']
 
-if uploaded_file is not None:
-    # Load dataset
-    data = pd.read_csv(uploaded_file)
-    st.subheader("Dataset Preview")
-    st.write(data.head())
-    st.write("Shape:", data.shape)
+features = df[['age','weight', 'cholesterol', 'gluc', 'smoke', 'alco','pulse_pressure', 'map', 'bmi']]
+target = df['disease']
 
-    # Feature Engineering
-    data['age_years'] = (data['age'] / 365).astype(int)
-    data['ap_hi']=data['ap_hi'].clip(80,250)
-    data['ap_lo']=data['ap_lo'].clip(40,150)
+num_features = features.select_dtypes(exclude='object').columns
+scaler = StandardScaler()
+features[num_features] = scaler.fit_transform(features[num_features])
+features = pd.get_dummies(features, columns=['cholesterol', 'gluc'])
 
-    # Encode categorical features
-    label_encoders = {}
-    for col in ["country", "occupation"]:
-        le = LabelEncoder()
-        data[col] = le.fit_transform(data[col])
-        label_encoders[col] = le
+# Train-test split
+x_train, x_test, y_train, y_test = train_test_split(features, target, random_state=42, test_size=0.33)
 
-    # Drop unused columns
-    data = data.drop(["date", "id"], axis=1)
+# -------------------
+# Train Models
+# -------------------
+results = {}
 
-    # Features & Target
-    X = data.drop("disease", axis=1)
-    y = data["disease"]
+# Decision Tree
+dt_model = DecisionTreeClassifier(random_state=42, max_depth=9, min_samples_split=0.01, min_samples_leaf=0.01)
+dt_model.fit(x_train, y_train)
+y_pred_dt = dt_model.predict(x_test)
+results["Decision Tree"] = accuracy_score(y_test, y_pred_dt)*100
 
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+# Logistic Regression
+log_model = LogisticRegression(max_iter=1000, random_state=42)
+log_model.fit(x_train, y_train)
+y_pred_log = log_model.predict(x_test)
+results["Logistic Regression"] = accuracy_score(y_test, y_pred_log)*100
 
-    # Standardization
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
+# KNN
+knn_model = KNeighborsClassifier(n_neighbors=7)
+knn_model.fit(x_train, y_train)
+y_pred_knn = knn_model.predict(x_test)
+results["KNN"] = accuracy_score(y_test, y_pred_knn)*100
 
-   # -----------------------------------
-# 4. Train Models
-# -----------------------------------
-    models = {
-    "Decision Tree": DecisionTreeClassifier(random_state=42, max_depth=10),
-    "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
-    "KNN": KNeighborsClassifier(n_neighbors=5)
-}
+# Best model
+best_model_name = max(results, key=results.get)
+best_accuracy = results[best_model_name]
 
-    results = {}
+# -------------------
+# Streamlit UI
+# -------------------
+st.title(" Disease Prediction App")
 
-    for name, model in models.items():
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-    
-        acc = accuracy_score(y_test, y_pred)
-        results[name] = acc
-    
-        st.subheader(f"🔹 {name} Results")
-        st.write(f"**Accuracy:** {acc*100:.2f}%")
-        st.write(f"**Precision:** {precision_score(y_test, y_pred)*100:.2f}%")
-        st.write(f"**Recall:** {recall_score(y_test, y_pred)*100:.2f}%")
-        st.write(f"**F1 Score:** {f1_score(y_test, y_pred)*100:.2f}%")
-        st.text("Classification Report:")
-        st.text(classification_report(y_test, y_pred))
-    
-    # Confusion Matrix Plot
-        fig, ax = plt.subplots()
-        sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt="d", cmap="Blues", ax=ax)
-        ax.set_title(f"{name} Confusion Matrix")
-        st.pyplot(fig)
+st.subheader(" Model Performance")
+for model, acc in results.items():
+    st.write(f"**{model} Accuracy:** {acc:.2f}%")
+st.success(f"Best Model: {best_model_name} ({best_accuracy:.2f}%)")
 
-# -----------------------------------
-# 5. Comparison Chart
-# -----------------------------------
-    st.subheader("📊 Model Accuracy Comparison")
+st.subheader("🔹 Enter Patient Details")
 
-    fig, ax = plt.subplots()
-    ax.bar(results.keys(), results.values(), color=["blue", "green", "orange", "red"])
-    ax.set_ylabel("Accuracy")
-    ax.set_ylim(0, 1)
-    st.pyplot(fig)
-    # ---------------------------------------------------
-    # EDA (Optional Visualization)
-    # ---------------------------------------------------
-    if st.checkbox("Show EDA Visualizations"):
-        st.subheader("Disease Distribution")
-        fig, ax = plt.subplots()
-        sns.countplot(x='disease', data=data, ax=ax)
-        st.pyplot(fig)
+age_days = st.number_input("Age in days", min_value=1, max_value=40000, value=18250)
+height_cm = st.number_input("Height (cm)", min_value=50, max_value=250, value=170)
+weight = st.number_input("Weight (kg)", min_value=10, max_value=200, value=70)
+ap_hi = st.number_input("Systolic BP (ap_hi)", min_value=50, max_value=250, value=120)
+ap_lo = st.number_input("Diastolic BP (ap_lo)", min_value=30, max_value=200, value=80)
+cholesterol = st.selectbox("Cholesterol", [1,2,3], format_func=lambda x: {1:"Normal",2:"Above Normal",3:"Well Above Normal"}[x])
+gluc = st.selectbox("Glucose", [1,2,3], format_func=lambda x: {1:"Normal",2:"Above Normal",3:"Well Above Normal"}[x])
+smoke = st.radio("Smoking?", [0,1], format_func=lambda x: "Yes" if x==1 else "No")
+alco = st.radio("Alcohol intake?", [0,1], format_func=lambda x: "Yes" if x==1 else "No")
 
-        for column in ['age_years', 'ap_hi', 'ap_lo', 'height', 'weight']:
-            st.write(f"### Histogram of {column}")
-            fig, ax = plt.subplots(figsize=(6,4))
-            sns.histplot(data=data, x=column, hue="disease", multiple="stack", kde=True, bins=30, ax=ax)
-            ax.set_title(f"{column} Distribution by Disease")
-            st.pyplot(fig)
-        for column in ['age_years', 'ap_hi', 'ap_lo', 'height', 'weight']:    
-            st.write(f"### Boxplot of {column}")
-            fig, ax = plt.subplots(figsize=(6,4))
-            sns.boxplot(data=data, x='disease', y=column, ax=ax)
-            ax.set_title(f"{column} Distribution by Disease")
-            st.pyplot(fig)
-        st.subheader("Correlation Matrix")
-        num_cols = [col for col in data.columns if data[col].dtype != object]
-        correlation_matrix = data[num_cols].corr()
-        fig, ax = plt.subplots(figsize=(12, 7))
-        sns.heatmap(correlation_matrix.round(2), annot=True, cmap='coolwarm', ax=ax)
-        st.pyplot(fig)
+if st.button("Predict"):
+    new_data = pd.DataFrame([{
+        "age": age_days, "height": height_cm, "weight": weight,
+        "ap_hi": ap_hi, "ap_lo": ap_lo, "cholesterol": cholesterol,
+        "gluc": gluc, "smoke": smoke, "alco": alco
+    }])
 
+    new_data['age'] = (new_data['age'] / 365).astype(int)
+    new_data['height'] = new_data['height'] / 100
+    new_data['pulse_pressure'] = new_data['ap_hi'] - new_data['ap_lo']
+    new_data['cholesterol'] = new_data['cholesterol'].apply(lambda x: 'normal' if x==1 else('above_normal' if x==2 else 'well_above_normal'))
+    new_data['gluc'] = new_data['gluc'].apply(lambda x: 'normal' if x==1 else('above_normal' if x==2 else 'well_above_normal'))
+    new_data['map'] = new_data['ap_lo'] + (new_data['ap_hi'] - new_data['ap_lo'])/3
+    new_data['bmi'] = new_data['weight'] / (new_data['height'])**2
+    new_data['sys_dsys_ratio'] = new_data['ap_hi'] / new_data['ap_lo']
+
+    new_features = new_data[['age','weight','cholesterol','gluc','smoke','alco','pulse_pressure','map','bmi']]
+    new_features[num_features] = scaler.transform(new_features[num_features])
+    new_features = pd.get_dummies(new_features, columns=['cholesterol','gluc'])
+    new_features = new_features.reindex(columns=features.columns, fill_value=0)
+
+    # Predictions from all models
+    pred_dt = dt_model.predict(new_features)[0]
+    pred_log = log_model.predict(new_features)[0]
+    pred_knn = knn_model.predict(new_features)[0]
+
+    st.subheader(" Predictions")
+    st.write(f"**Decision Tree:** {pred_dt}")
+    st.write(f"**Logistic Regression:** {pred_log}")
+    st.write(f"**KNN:** {pred_knn}")
+    st.success(f"✅ Recommended Model: {best_model_name} → Prediction: {eval(f'pred_{best_model_name.split()[0].lower()}')}")
 
