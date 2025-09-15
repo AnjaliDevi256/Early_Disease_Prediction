@@ -82,9 +82,6 @@ labels.append("KNN")
 # -----------------------------------
 # Show Accuracy Comparison
 # -----------------------------------
-st.subheader(" Model Performance")
-for model, acc in results.items():
-    st.write(f"**{model} Accuracy:** {acc:.2f}%")
 st.subheader(" Model Accuracy Comparison")
 acc_df = pd.DataFrame({"Model": labels, "Accuracy": values})
 st.bar_chart(acc_df.set_index("Model"))
@@ -169,4 +166,5 @@ if st.button("Predict Disease"):
     # Best model’s prediction
     best_prediction = predictions[best_model_name]
     st.success(f"Recommended Model: {best_model_name} → {'Disease' if best_prediction==1 else 'No Disease'}")
+
 
