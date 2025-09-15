@@ -17,7 +17,7 @@ from sklearn.neighbors import KNeighborsClassifier
 # -----------------------------------
 # Load dataset
 # -----------------------------------
-st.title("🩺 Early Disease Prediction System")
+st.title("Early Disease Prediction System")
 st.write("This app predicts disease likelihood based on health parameters using multiple ML models.")
 
 data = pd.read_csv("Data_file.csv")
@@ -121,7 +121,7 @@ active = st.radio("Physically active?", [0, 1], format_func=lambda x: "Yes" if x
 if st.button("Predict Disease"):
     new_data = pd.DataFrame([{
         "age": age,
-        "height": height_cm/100,
+        "height": height/100,
         "weight": weight,
         "ap_hi": ap_hi,
         "ap_lo": ap_lo,
@@ -166,5 +166,6 @@ if st.button("Predict Disease"):
     # Best model’s prediction
     best_prediction = predictions[best_model_name]
     st.success(f"Recommended Model: {best_model_name} → {'Disease' if best_prediction==1 else 'No Disease'}")
+
 
 
